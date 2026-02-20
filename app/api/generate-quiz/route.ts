@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimit } from "@/lib/rate-limit";
 
 export interface QuizQuestion {
   question: string;
@@ -8,6 +9,20 @@ export interface QuizQuestion {
 }
 
 export async function POST(req: NextRequest) {
+  // Récupération de l'IP pour le rate limiting
+  const ip = req.headers.get("x-forwarded-for") || "anonymous";
+  const { success, remaining } = rateLimit(ip);
+
+  if (!success) {
+    return NextResponse.json(
+      { error: "Trop de requêtes. Veuillez patienter une minute." },
+      {
+        status: 429,
+        headers: { "X-RateLimit-Remaining": remaining.toString() },
+      },
+    );
+  }
+
   const { topic, mode } = await req.json();
   const isIntrus = mode === "intrus";
 
